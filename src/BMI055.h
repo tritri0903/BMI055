@@ -1,8 +1,5 @@
-#ifndef BMI055_h
-#define BMI055_h
 
 #include "Arduino.h"
-#include "Wire.h"
 
 class BMI055
 {
@@ -21,6 +18,12 @@ class BMI055
     {
         int x, y, z;
     };
+
+    struct posValue
+    {
+      int16_t x[1000], y[1000], z[1000];
+    };
+    
     
 
     struct deviceParam
@@ -36,6 +39,7 @@ class BMI055
       uint8_t dataRx;
 
       offsetPosition offsetPos[4];
+      posValue rawPos;
 
       bool isConnected;
       bool isCalibrated = false;
@@ -59,7 +63,7 @@ class BMI055
     void getGyro();
 
     bool calibrate_gyro();
-    void calibrateDevice(int interval, deviceParam *device);
+    void calibrateDevice(int interval, deviceParam *device,  int nbrPos);
 
     void avrg_reading();
     void accel_avrg_reading();
@@ -75,5 +79,3 @@ class BMI055
     int16_t getZRotation();
     uint8_t readReg(deviceParam *device, int reg, int data);
 };
-
-#endif

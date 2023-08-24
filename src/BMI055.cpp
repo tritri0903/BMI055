@@ -1,8 +1,7 @@
 #include "BMI055.h"
 #include "Arduino.h"
-#include "Wire.h"
 #include "SPI.h"
-#include "math.h"
+
 
 #define ACC_CHIPID  0x00
 #define ACC_X_LSB   0x02
@@ -96,7 +95,7 @@ int16_t BMI055::getZRotation(){
 };
 
 void BMI055::initialize(deviceParam *device) {
-/**/ 
+
     device->error_status = NO_ERROR;
     spi = new SPIClass(FSPI);
     spi->begin(device->PARAM_SPI_CLK, device->PARAM_SPI_PIN_MISO, device->PARAM_SPI_PIN_MOSI, device->PARAM_SPI_PIN_CS);
@@ -106,8 +105,8 @@ void BMI055::initialize(deviceParam *device) {
     
 
     if(readReg(device, ACC_CHIPID) == 0xFA){
-        //readReg(device, ACC_SFRSET, 0xb6);
-        delay(100);
+        readReg(device, ACC_SFRSET, 0xb6);
+        delay(500);
         readReg(device, ACC_RANGE, 0b0000011); // 2g
         delay(10);
         readReg(device, ACC_BW, 0x0d); // 500hz
@@ -119,7 +118,7 @@ void BMI055::initialize(deviceParam *device) {
     }
     else if (readReg(device, GYRO_CHIPID) == 0x0F){
         readReg(device, GYRO_SFRSET, 0xB6);
-        delay(100);
+        delay(1000);
         readReg(device, GYRO_RANGE, 0x00); // range set to 2000°/s
         delay(10);
         readReg(device, GYRO_BW, 0b00000011); // 400Hz
@@ -171,9 +170,9 @@ void BMI055::getAccel() {
     int16_t temp_x, temp_y, temp_z;
 
     //Reading  
-    temp_x = (int16_t)(readReg(&accel, ACC_X_LSB)|readReg(&accel, ACC_X_MSB)<<8);
-    temp_y = (int16_t)(readReg(&accel, ACC_Y_LSB)|readReg(&accel, ACC_Y_MSB)<<8);
-    temp_z = (int16_t)(readReg(&accel, ACC_Z_LSB)|readReg(&accel, ACC_Z_MSB)<<8);
+    temp_x = getX();
+    temp_y = getY();
+    temp_z = getZ();
 
     accel.x = temp_x ;//* 0.0653f ;
     accel.y = temp_y ;//* 0.0653f ;
@@ -204,39 +203,68 @@ bool BMI055::getRawSample(int seconds, int nbr){
 
 }
 
-void BMI055::calibrateDevice(int interval, deviceParam *device){
-    uint32_t startMillis;
-    uint32_t actualMillis;
-    uint16_t count;
-    
-    for(int i = 0; i <= 3; i++){
-        startMillis = millis();
-        int16_t temp_x[200],  temp_y[200], temp_z[200];
-        int16_t sum_x = 0, sum_y = 0, sum_z = 0;
-        int32_t var_x = 0, var_y = 0, var_z = 0;
-        int64_t global_var = 0;
-        count = 0;
-        while (actualMillis < startMillis + interval)
+void BMI055::calibrateDevice(int interval, deviceParam *device, int nbrPos){
+    uint32_t startMillis = millis();
+    uint32_t actualMillis = 0;
+    uint16_t count = 0;
+    int32_t sum_x = 0, sum_y = 0, sum_z = 0;
+    int16_t moy_x = 0, moy_y = 0, moy_z =0;
+    uint32_t var_x = 0, var_y = 0, var_z = 0;
+    int64_t global_var = 0;
+
+    while (actualMillis < startMillis + interval)
+    {
+        if(count>1000) break;
+        actualMillis = millis();
+        if(digitalRead(device->interuptPin))
         {
-            actualMillis = millis();
-            if (digitalRead(device->interuptPin))
-            {
-                temp_x[count] = (int16_t)(readReg(&accel, ACC_X_LSB)|readReg(&accel, ACC_X_MSB)<<8);
-                temp_y[count] = (int16_t)(readReg(&accel, ACC_Y_LSB)|readReg(&accel, ACC_Y_MSB)<<8);
-                temp_z[count] = (int16_t)(readReg(&accel, ACC_Z_LSB)|readReg(&accel, ACC_Z_MSB)<<8);
-                delay(10);
-                count++;
-                Serial.print(".");
-            }
+            device->rawPos.x[count] = getX();
+            device->rawPos.y[count] = getY();
+            device->rawPos.z[count] = getZ();
+            delay(10);
+            count++;
+            Serial.print(".");
         }
-        Serial.print(i);
-        Serial.print(" N  Reading Finished ->");
-        Serial.println(count);
+    }
+    Serial.print(count);
+    Serial.println(" samples -> Reading Finished -> Starting computation for mean");
+    for(int j = 0; j < count-10; j++){
+        sum_x = 0;
+        sum_y = 0;
+        sum_z = 0;
+        var_x = 0;
+        var_y = 0;
+        var_z = 0;
+        for(int i = j; i < j+10; i++){
+            sum_x += device->rawPos.x[i];
+            sum_y += device->rawPos.y[i];
+            sum_z += device->rawPos.z[i];
+        }
+        moy_x = sum_x/10;        
+        moy_y = sum_y/10;
+        moy_z = sum_z/10;
+        for (int i = j; i < j+10; i++)
+        {
+            var_x += sq(device->rawPos.x[i] - moy_x);
+        }
+
+        Serial.print(device->rawPos.x[j]);
+        Serial.print(",");
+        Serial.print(moy_x);
+        Serial.print(",");
+        Serial.println(var_x/10);
+    }
+
+/*    for(int i = 0; i < nbrPos; i++){
+        startMillis = millis();
+
         for(int i = 0; i < count; i++){
-            sum_x += temp_x[i];
-            sum_y += temp_y[i];
-            sum_z += temp_z[i];
+            temp_x[i] = 0;
+            temp_y[i] = 0;
+            temp_z[i] = 0;
         }
+
+        Serial.println(sum_x);
         Serial.println("Sum computed");
         for(int i = 0; i < count; i++){
             //var_x += (temp_x[i] - (sum_x/count)) * (temp_x[i] - (sum_x/count));
@@ -248,11 +276,11 @@ void BMI055::calibrateDevice(int interval, deviceParam *device){
             var_z += temp_z[i] * temp_z[i];
         }
 
-        var_x = var_x/count - sum_x/count;
-        var_y = var_y/count - sum_y/count;
-        var_z = var_z/count - sum_z/count;
+        int32_t varx = var_x/count - sum_x/count;
+        int32_t vary = var_y/count - sum_y/count;
+        int32_t varz = var_z/count - sum_z/count;
 
-        global_var = sqrt(var_x*var_x + var_y*var_y + var_z*var_z);
+        global_var = sqrt(varx*varx + vary*vary + varz*varz);
         
 
         Serial.print(var_x);
@@ -274,7 +302,8 @@ void BMI055::calibrateDevice(int interval, deviceParam *device){
         delay(5000);
     }
 
-    device->isCalibrated = true;
+    device->isCalibrated = true;*/
+
     
 }
 
