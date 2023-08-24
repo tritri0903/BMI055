@@ -2,6 +2,7 @@
 #include "Arduino.h"
 #include "Wire.h"
 #include "SPI.h"
+#include "math.h"
 
 #define ACC_CHIPID  0x00
 #define ACC_X_LSB   0x02
@@ -70,6 +71,30 @@ uint8_t BMI055::readReg(deviceParam *device, int reg, int data = 0) {
     return dataTxRx[1];
 };
 
+int16_t BMI055::getX(){
+    return (int16_t)(readReg(&accel, ACC_X_LSB)|readReg(&accel, ACC_X_MSB)<<8);
+
+};
+int16_t BMI055::getY(){
+    return (int16_t)(readReg(&accel, ACC_Y_LSB)|readReg(&accel, ACC_Y_MSB)<<8);
+
+};
+int16_t BMI055::getZ(){
+    return (int16_t)(readReg(&accel, ACC_Z_LSB)|readReg(&accel, ACC_Z_MSB)<<8);
+};
+
+int16_t BMI055::getXRotation(){
+    return (int16_t)(readReg(&gyro, GYRO_X_LSB)|readReg(&gyro, GYRO_X_MSB)<<8);
+
+};
+int16_t BMI055::getYRotation(){
+    return (int16_t)(readReg(&gyro, GYRO_Y_LSB)|readReg(&gyro, GYRO_Y_MSB)<<8); 
+
+};
+int16_t BMI055::getZRotation(){
+    return (int16_t)(readReg(&gyro, GYRO_Z_LSB)|readReg(&gyro, GYRO_Z_MSB)<<8);
+};
+
 void BMI055::initialize(deviceParam *device) {
 /**/ 
     device->error_status = NO_ERROR;
@@ -77,6 +102,8 @@ void BMI055::initialize(deviceParam *device) {
     spi->begin(device->PARAM_SPI_CLK, device->PARAM_SPI_PIN_MISO, device->PARAM_SPI_PIN_MOSI, device->PARAM_SPI_PIN_CS);
 
     pinMode(device->PARAM_SPI_PIN_CS, OUTPUT);
+    pinMode(device->interuptPin, INPUT);
+    
 
     if(readReg(device, ACC_CHIPID) == 0xFA){
         //readReg(device, ACC_SFRSET, 0xb6);
@@ -91,7 +118,9 @@ void BMI055::initialize(deviceParam *device) {
         device->error_status = CONNECTED;
     }
     else if (readReg(device, GYRO_CHIPID) == 0x0F){
-        readReg(device, GYRO_RANGE, 0x01);
+        readReg(device, GYRO_SFRSET, 0xB6);
+        delay(100);
+        readReg(device, GYRO_RANGE, 0x00); // range set to 2000°/s
         delay(10);
         readReg(device, GYRO_BW, 0b00000011); // 400Hz
         delay(10);
@@ -108,69 +137,144 @@ void BMI055::initialize(deviceParam *device) {
 };
 
 bool BMI055::calibrate_gyro(){
-
-    readReg(&gyro, GYRO_FOC, B00000111);
+    readReg(&gyro, GYRO_SOC, B01000111);
     delay(10);
-    readReg(&gyro, GYRO_FOC, B00101111);
+    //readReg(&gyro, GYRO_RANGE, 0x04);
     delay(10);
+    readReg(&gyro, GYRO_FOC, B11000111);
+    delay(10);
+    readReg(&gyro, GYRO_FOC, B11101111);
+    delay(100);
+    readReg(&gyro, GYRO_RANGE, 0x00);
 
-    while (readReg(&gyro, GYRO_FOC, 0) == B00000111)
+    while (readReg(&gyro, GYRO_FOC) == B00101111);
+
+    return 1;
+};
+
+void BMI055::getGyro() {
+    int16_t temp_x, temp_y, temp_z;
+
+    //Reading angular rate 
+    temp_x = getXRotation();
+    temp_y = getYRotation(); 
+    temp_z = getZRotation();
+
+    
+    gyro.x = temp_x / 16.4f; //(sum_x / 20) ;
+    gyro.y = temp_y / 16.4f; //(sum_y / 20) ;
+    gyro.z = temp_z / 16.4f; //(sum_z / 20) ;
+    
+};
+
+void BMI055::getAccel() {
+    int16_t temp_x, temp_y, temp_z;
+
+    //Reading  
+    temp_x = (int16_t)(readReg(&accel, ACC_X_LSB)|readReg(&accel, ACC_X_MSB)<<8);
+    temp_y = (int16_t)(readReg(&accel, ACC_Y_LSB)|readReg(&accel, ACC_Y_MSB)<<8);
+    temp_z = (int16_t)(readReg(&accel, ACC_Z_LSB)|readReg(&accel, ACC_Z_MSB)<<8);
+
+    accel.x = temp_x ;//* 0.0653f ;
+    accel.y = temp_y ;//* 0.0653f ;
+    accel.z = temp_z ;//* 0.0653f ;
+    
+};
+
+bool BMI055::getRawSample(int seconds, int nbr){
+    int16_t temp_x[nbr], temp_y[nbr], temp_z[nbr];
+    int sum_x, sum_y, sum_z;
+
+    for (size_t i = 0; i < nbr; i++)
     {
-        /* code */
-    }
-    return 0;
-};
+        while (!digitalRead(accel.interuptPin));
+        
+        sum_x += (int16_t)(readReg(&accel, ACC_X_LSB)|readReg(&accel, ACC_X_MSB)<<8);
+        sum_y += (int16_t)(readReg(&accel, ACC_Y_LSB)|readReg(&accel, ACC_Y_MSB)<<8);
+        sum_z += (int16_t)(readReg(&accel, ACC_Z_LSB)|readReg(&accel, ACC_Z_MSB)<<8);
 
-void BMI055::read_gyro() {
-
-    gyro.x = (int16_t)(readReg(&gyro, GYRO_X_LSB)|readReg(&gyro, GYRO_X_MSB)<<8) * 0.03051757812; // same as x / 32768.0 * 1000.0
-    gyro.y = (int16_t)(readReg(&gyro, GYRO_Y_LSB)|readReg(&gyro, GYRO_Y_MSB)<<8) * 0.03051757812; 
-    gyro.z = (int16_t)(readReg(&gyro, GYRO_Z_LSB)|readReg(&gyro, GYRO_Z_MSB)<<8) * 0.03051757812; 
-
-    avrg_reading();
-    
-};
-
-void BMI055::avrg_reading(){
-    float sumx = 0;
-    float sumy = 0;
-    float sumz = 0;
-    for (int i = 0; i < 20; i++){
-        sumx += gyro.x;
-        sumy += gyro.y;
-        sumz += gyro.z;
         delay(10);
     }
 
-    gyro.x = sumx/20;
-    gyro.y = sumy/20;
-    gyro.z = sumz/20;
-};
+    accel.avg_x = sum_x/nbr;
+    accel.avg_y = sum_y/nbr;
+    accel.avg_z = sum_z/nbr;
 
-void BMI055::read_accel() {
+    return 1;
+
+}
+
+void BMI055::calibrateDevice(int interval, deviceParam *device){
+    uint32_t startMillis;
+    uint32_t actualMillis;
+    uint16_t count;
     
-    accel.x = (int16_t)(readReg(&accel, ACC_X_LSB)|readReg(&accel, ACC_X_MSB)<<8);
-    accel.y = (int16_t)(readReg(&accel, ACC_Y_LSB)|readReg(&accel, ACC_Y_MSB)<<8);
-    accel.z = (int16_t)(readReg(&accel, ACC_Z_LSB)|readReg(&accel, ACC_Z_MSB)<<8);
-    accel.x /= 16384;
-    accel.y /= 16384;
-    accel.z /= 16384;
+    for(int i = 0; i <= 3; i++){
+        startMillis = millis();
+        int16_t temp_x[200],  temp_y[200], temp_z[200];
+        int16_t sum_x = 0, sum_y = 0, sum_z = 0;
+        int32_t var_x = 0, var_y = 0, var_z = 0;
+        int64_t global_var = 0;
+        count = 0;
+        while (actualMillis < startMillis + interval)
+        {
+            actualMillis = millis();
+            if (digitalRead(device->interuptPin))
+            {
+                temp_x[count] = (int16_t)(readReg(&accel, ACC_X_LSB)|readReg(&accel, ACC_X_MSB)<<8);
+                temp_y[count] = (int16_t)(readReg(&accel, ACC_Y_LSB)|readReg(&accel, ACC_Y_MSB)<<8);
+                temp_z[count] = (int16_t)(readReg(&accel, ACC_Z_LSB)|readReg(&accel, ACC_Z_MSB)<<8);
+                delay(10);
+                count++;
+                Serial.print(".");
+            }
+        }
+        Serial.print(i);
+        Serial.print(" N  Reading Finished ->");
+        Serial.println(count);
+        for(int i = 0; i < count; i++){
+            sum_x += temp_x[i];
+            sum_y += temp_y[i];
+            sum_z += temp_z[i];
+        }
+        Serial.println("Sum computed");
+        for(int i = 0; i < count; i++){
+            //var_x += (temp_x[i] - (sum_x/count)) * (temp_x[i] - (sum_x/count));
+            //var_y += (temp_y[i] - (sum_y/count)) * (temp_y[i] - (sum_y/count));
+            //var_z += (temp_z[i] - (sum_z/count)) * (temp_z[i] - (sum_z/count));
 
-    //accel_avrg_reading();
-};
+            var_x += temp_x[i] * temp_x[i];
+            var_y += temp_y[i] * temp_y[i];
+            var_z += temp_z[i] * temp_z[i];
+        }
 
-void BMI055::accel_avrg_reading(){
-    float sumx = 0;
-    float sumy = 0;
-    float sumz = 0;
-    for (int i = 0; i < 20; i++){
-        sumx += accel.x;
-        sumy += accel.y;
-        sumz += accel.z;
-        delay(10);
+        var_x = var_x/count - sum_x/count;
+        var_y = var_y/count - sum_y/count;
+        var_z = var_z/count - sum_z/count;
+
+        global_var = sqrt(var_x*var_x + var_y*var_y + var_z*var_z);
+        
+
+        Serial.print(var_x);
+        Serial.print(", ");
+        Serial.print(var_y);
+        Serial.print(", ");
+        Serial.print(var_z);
+
+        Serial.print(" - ");
+        Serial.println(global_var);    
+        
+        
+        device->offsetPos[i].x = (int32_t)sum_x/count;
+        device->offsetPos[i].y = (int32_t)sum_y/count;
+        device->offsetPos[i].z = (int32_t)sum_z/count;
+        Serial.print(" x offset: ");
+        Serial.println(device->offsetPos[i].x);
+        Serial.println("Turn");
+        delay(5000);
     }
 
-    accel.x = sumx/20;
-    accel.y = sumy/20;
-    accel.z = sumz/20;
-};
+    device->isCalibrated = true;
+    
+}
+

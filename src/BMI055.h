@@ -17,6 +17,12 @@ class BMI055
       CONNECTED
     };
 
+    struct offsetPosition
+    {
+        int x, y, z;
+    };
+    
+
     struct deviceParam
     {
       uint8_t PARAM_SPI_CLK = -1;
@@ -29,27 +35,44 @@ class BMI055
 
       uint8_t dataRx;
 
+      offsetPosition offsetPos[4];
+
       bool isConnected;
+      bool isCalibrated = false;
+      bool posFinished = false;
 
       float x, y, z;
+
+      float avg_x, avg_y, avg_z;
+
+      uint8_t interuptPin = 5;
     } ;
 
     deviceParam accel;
-
     deviceParam gyro;
 
     void initialize(deviceParam *device); // sensor startup and various other functions - you need to run this line of code for the sensor to work
 
     void read_gyro(); // run this to read gyroscope data. gyroscopic data will be accessible in bno.gyro. x / y / z
-    void read_accel(); // run this to read accelerometer data. accelerometer data will be accessible in bno.accel. x / y / z
+    void getAccel(); // run this to read accelerometer data. accelerometer data will be accessible in bno.accel. x / y / z
+
+    void getGyro();
 
     bool calibrate_gyro();
-    void calibrate_accel();
+    void calibrateDevice(int interval, deviceParam *device);
 
     void avrg_reading();
     void accel_avrg_reading();
 
+    bool getRawSample(int seconds, int nbr);
+
   private:
+    int16_t getX();
+    int16_t getY();
+    int16_t getZ();
+    int16_t getXRotation();
+    int16_t getYRotation();
+    int16_t getZRotation();
     uint8_t readReg(deviceParam *device, int reg, int data);
 };
 
