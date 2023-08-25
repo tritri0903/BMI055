@@ -211,21 +211,23 @@ void BMI055::calibrateDevice(int interval, deviceParam *device, int nbrPos){
     int16_t moy_x = 0, moy_y = 0, moy_z =0;
     uint32_t var_x = 0, var_y = 0, var_z = 0;
     int64_t global_var = 0;
+    bool isMoving;
 
+    Serial.println(millis());
     while (actualMillis < startMillis + interval)
     {
-        if(count>1000) break;
         actualMillis = millis();
         if(digitalRead(device->interuptPin))
         {
             device->rawPos.x[count] = getX();
             device->rawPos.y[count] = getY();
             device->rawPos.z[count] = getZ();
-            delay(10);
             count++;
-            Serial.print(".");
+            
         }
+        if(count>10000) break;
     }
+    Serial.println(millis());
     Serial.print(count);
     Serial.println(" samples -> Reading Finished -> Starting computation for mean");
     for(int j = 0; j < count-10; j++){
@@ -235,24 +237,39 @@ void BMI055::calibrateDevice(int interval, deviceParam *device, int nbrPos){
         var_x = 0;
         var_y = 0;
         var_z = 0;
-        for(int i = j; i < j+10; i++){
+        for(int i = j; i < j+100; i++){
             sum_x += device->rawPos.x[i];
             sum_y += device->rawPos.y[i];
             sum_z += device->rawPos.z[i];
         }
-        moy_x = sum_x/10;        
-        moy_y = sum_y/10;
-        moy_z = sum_z/10;
-        for (int i = j; i < j+10; i++)
+        moy_x = sum_x/100;        
+        moy_y = sum_y/100;
+        moy_z = sum_z/100;
+        for (int i = j; i < j+100; i++)
         {
             var_x += sq(device->rawPos.x[i] - moy_x);
+            var_y += sq(device->rawPos.y[i] - moy_y);
+            var_z += sq(device->rawPos.z[i] - moy_z);
         }
 
-        Serial.print(device->rawPos.x[j]);
-        Serial.print(",");
+        global_var = sqrt(sq(var_x/100) + sq(var_y/100) + sq(var_z/100));
+
+        if (sq(global_var) > 20000000)
+        {
+            isMoving = true;
+        }
+        else isMoving = false;
+        
+
         Serial.print(moy_x);
         Serial.print(",");
-        Serial.println(var_x/10);
+        Serial.print(moy_y);
+        Serial.print(",");
+        Serial.print(moy_z);
+        Serial.print(",");
+        Serial.print(sq(global_var));
+        Serial.print(",");
+        Serial.println(isMoving);
     }
 
 /*    for(int i = 0; i < nbrPos; i++){

@@ -21,7 +21,7 @@ class BMI055
 
     struct posValue
     {
-      int16_t x[1000], y[1000], z[1000];
+      int16_t x[10000], y[10000], z[10000];
     };
     
     
