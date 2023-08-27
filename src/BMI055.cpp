@@ -204,13 +204,14 @@ bool BMI055::getRawSample(int seconds, int nbr){
 }
 
 void BMI055::calibrateDevice(int interval, deviceParam *device, int nbrPos){
+    const uint8_t SAMPLE_LENGTH = 10;
     uint32_t startMillis = millis();
     uint32_t actualMillis = 0;
-    uint16_t count = 0;
+    uint16_t sampleRawLenght = 0, varianceLenght = 0;
     int32_t sum_x = 0, sum_y = 0, sum_z = 0;
     int16_t moy_x = 0, moy_y = 0, moy_z =0;
     uint32_t var_x = 0, var_y = 0, var_z = 0;
-    int64_t global_var = 0;
+    uint64_t global_var[1500], global_var_sum, global_var_moy = 0;
     bool isMoving;
 
     Serial.println(millis());
@@ -219,63 +220,78 @@ void BMI055::calibrateDevice(int interval, deviceParam *device, int nbrPos){
         actualMillis = millis();
         if(digitalRead(device->interuptPin))
         {
-            device->rawPos.x[count] = getX();
-            device->rawPos.y[count] = getY();
-            device->rawPos.z[count] = getZ();
-            count++;
+            device->rawPos.x[sampleRawLenght] = getX();
+            device->rawPos.y[sampleRawLenght] = getY();
+            device->rawPos.z[sampleRawLenght] = getZ();
+            sampleRawLenght++;
             
         }
-        if(count>10000) break;
+        if(sampleRawLenght>10000) break;
     }
     Serial.println(millis());
-    Serial.print(count);
+    Serial.print(sampleRawLenght);
     Serial.println(" samples -> Reading Finished -> Starting computation for mean");
-    for(int j = 0; j < count-10; j++){
+    for(int j = 5; j < sampleRawLenght-10; j=j+5){
         sum_x = 0;
         sum_y = 0;
         sum_z = 0;
         var_x = 0;
         var_y = 0;
         var_z = 0;
-        for(int i = j; i < j+100; i++){
+        for(int i = j - 5; i < j+SAMPLE_LENGTH - 5; i++){
             sum_x += device->rawPos.x[i];
             sum_y += device->rawPos.y[i];
             sum_z += device->rawPos.z[i];
         }
-        moy_x = sum_x/100;        
-        moy_y = sum_y/100;
-        moy_z = sum_z/100;
-        for (int i = j; i < j+100; i++)
+        moy_x = sum_x/SAMPLE_LENGTH;        
+        moy_y = sum_y/SAMPLE_LENGTH;
+        moy_z = sum_z/SAMPLE_LENGTH;
+        for (int i = j - 5; i < j+SAMPLE_LENGTH - 5; i++)
         {
             var_x += sq(device->rawPos.x[i] - moy_x);
             var_y += sq(device->rawPos.y[i] - moy_y);
             var_z += sq(device->rawPos.z[i] - moy_z);
         }
+        var_x /= SAMPLE_LENGTH;
+        var_y /= SAMPLE_LENGTH;
+        var_z /= SAMPLE_LENGTH;
 
-        global_var = sqrt(sq(var_x/100) + sq(var_y/100) + sq(var_z/100));
+        global_var[j/5] = sq(var_x) + sq(var_y) + sq(var_z);
 
-        if (sq(global_var) > 20000000)
+        if(SAMPLE_LENGTH < j/5){
+            for (int i = j/5 - SAMPLE_LENGTH; i < j/5; i++)
+            {
+                global_var_sum += global_var[i];
+                varianceLenght = i;
+            }
+            global_var_moy = global_var_sum/10;
+            global_var_sum = 0;            
+        }
+
+        if (global_var_moy > 500000000)
         {
             isMoving = true;
         }
         else isMoving = false;
         
-
         Serial.print(moy_x);
         Serial.print(",");
         Serial.print(moy_y);
         Serial.print(",");
         Serial.print(moy_z);
         Serial.print(",");
-        Serial.print(sq(global_var));
+        Serial.print(global_var[j/5]);
+        Serial.print(",");
+        Serial.print(global_var_moy);
         Serial.print(",");
         Serial.println(isMoving);
     }
+    
 
 /*    for(int i = 0; i < nbrPos; i++){
         startMillis = millis();
 
-        for(int i = 0; i < count; i++){
+        for(int i = 0; i < sampleRawLenght; i++){
             temp_x[i] = 0;
             temp_y[i] = 0;
             temp_z[i] = 0;
@@ -283,19 +299,19 @@ void BMI055::calibrateDevice(int interval, deviceParam *device, int nbrPos){
 
         Serial.println(sum_x);
         Serial.println("Sum computed");
-        for(int i = 0; i < count; i++){
-            //var_x += (temp_x[i] - (sum_x/count)) * (temp_x[i] - (sum_x/count));
-            //var_y += (temp_y[i] - (sum_y/count)) * (temp_y[i] - (sum_y/count));
-            //var_z += (temp_z[i] - (sum_z/count)) * (temp_z[i] - (sum_z/count));
+        for(int i = 0; i < sampleRawLenght; i++){
+            //var_x += (temp_x[i] - (sum_x/sampleRawLenght)) * (temp_x[i] - (sum_x/sampleRawLenght));
+            //var_y += (temp_y[i] - (sum_y/sampleRawLenght)) * (temp_y[i] - (sum_y/sampleRawLenght));
+            //var_z += (temp_z[i] - (sum_z/sampleRawLenght)) * (temp_z[i] - (sum_z/sampleRawLenght));
 
             var_x += temp_x[i] * temp_x[i];
             var_y += temp_y[i] * temp_y[i];
             var_z += temp_z[i] * temp_z[i];
         }
 
-        int32_t varx = var_x/count - sum_x/count;
-        int32_t vary = var_y/count - sum_y/count;
-        int32_t varz = var_z/count - sum_z/count;
+        int32_t varx = var_x/sampleRawLenght - sum_x/sampleRawLenght;
+        int32_t vary = var_y/sampleRawLenght - sum_y/sampleRawLenght;
+        int32_t varz = var_z/sampleRawLenght - sum_z/sampleRawLenght;
 
         global_var = sqrt(varx*varx + vary*vary + varz*varz);
         
@@ -310,9 +326,9 @@ void BMI055::calibrateDevice(int interval, deviceParam *device, int nbrPos){
         Serial.println(global_var);    
         
         
-        device->offsetPos[i].x = (int32_t)sum_x/count;
-        device->offsetPos[i].y = (int32_t)sum_y/count;
-        device->offsetPos[i].z = (int32_t)sum_z/count;
+        device->offsetPos[i].x = (int32_t)sum_x/sampleRawLenght;
+        device->offsetPos[i].y = (int32_t)sum_y/sampleRawLenght;
+        device->offsetPos[i].z = (int32_t)sum_z/sampleRawLenght;
         Serial.print(" x offset: ");
         Serial.println(device->offsetPos[i].x);
         Serial.println("Turn");
