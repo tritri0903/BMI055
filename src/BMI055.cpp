@@ -1,6 +1,7 @@
 #include "BMI055.h"
 #include "Arduino.h"
 #include "SPI.h"
+#include <vector>
 
 
 #define ACC_CHIPID  0x00
@@ -51,7 +52,22 @@ SPIClass *spi;
 
 BMI055::BMI055(){};
 
-uint8_t BMI055::readReg(deviceParam *device, int reg, int data = 0) {
+uint8_t BMI055::readRegister(int reg) {
+    
+    uint8_t dataTxRx[2] = { (uint8_t) (reg | (1<<7)), (uint8_t) 0 };
+
+    spi->beginTransaction(SPISettings(PARAM_SPI_CLK_FREQ, MSBFIRST, SPI_MODE0));
+    digitalWrite(PARAM_SPI_PIN_CS, LOW);
+
+    spi->transfer(dataTxRx, 2);
+
+    digitalWrite(PARAM_SPI_PIN_CS, HIGH);
+    spi->endTransaction();
+
+    return dataTxRx[1];
+};
+
+uint8_t BMI055::writeRegister(int reg, int data = 0) {
     
     uint8_t dataTxRx[2] = { (uint8_t) (reg | (1<<7)), (uint8_t) data };
 
@@ -59,233 +75,231 @@ uint8_t BMI055::readReg(deviceParam *device, int reg, int data = 0) {
         dataTxRx[0] = { (uint8_t) (reg | (0<<7))};
     }
 
-    spi->beginTransaction(SPISettings(device->PARAM_SPI_CLK_FREQ, MSBFIRST, SPI_MODE0));
-    digitalWrite(device->PARAM_SPI_PIN_CS, LOW);
+    spi->beginTransaction(SPISettings(PARAM_SPI_CLK_FREQ, MSBFIRST, SPI_MODE0));
+    digitalWrite(PARAM_SPI_PIN_CS, LOW);
 
     spi->transfer(dataTxRx, 2);
 
-    digitalWrite(device->PARAM_SPI_PIN_CS, HIGH);
+    digitalWrite(PARAM_SPI_PIN_CS, HIGH);
     spi->endTransaction();
 
     return dataTxRx[1];
 };
 
 int16_t BMI055::getX(){
-    return (int16_t)(readReg(&accel, ACC_X_LSB)|readReg(&accel, ACC_X_MSB)<<8);
+    return (int16_t)(writeRegister(ACC_X_LSB)|writeRegister(ACC_X_MSB)<<8);
 
 };
 int16_t BMI055::getY(){
-    return (int16_t)(readReg(&accel, ACC_Y_LSB)|readReg(&accel, ACC_Y_MSB)<<8);
+    return (int16_t)(readRegister(ACC_Y_LSB)|readRegister(ACC_Y_MSB)<<8);
 
 };
 int16_t BMI055::getZ(){
-    return (int16_t)(readReg(&accel, ACC_Z_LSB)|readReg(&accel, ACC_Z_MSB)<<8);
+    return (int16_t)(readRegister(ACC_Z_LSB)|readRegister(ACC_Z_MSB)<<8);
 };
 
 int16_t BMI055::getXRotation(){
-    return (int16_t)(readReg(&gyro, GYRO_X_LSB)|readReg(&gyro, GYRO_X_MSB)<<8);
+    return (int16_t)(readRegister(GYRO_X_LSB)|readRegister(GYRO_X_MSB)<<8);
 
 };
 int16_t BMI055::getYRotation(){
-    return (int16_t)(readReg(&gyro, GYRO_Y_LSB)|readReg(&gyro, GYRO_Y_MSB)<<8); 
+    return (int16_t)(readRegister(GYRO_Y_LSB)|readRegister(GYRO_Y_MSB)<<8); 
 
 };
 int16_t BMI055::getZRotation(){
-    return (int16_t)(readReg(&gyro, GYRO_Z_LSB)|readReg(&gyro, GYRO_Z_MSB)<<8);
+    return (int16_t)(readRegister(GYRO_Z_LSB)|readRegister(GYRO_Z_MSB)<<8);
 };
 
-void BMI055::initialize(deviceParam *device) {
-
-    device->error_status = NO_ERROR;
+void BMI055::begin(uint8_t spiClk, uint8_t spiMosi, uint8_t spiMiso, uint8_t spiCs, uint32_t spiClkFreq) {
+    PARAM_SPI_CLK = spiClk;
+    PARAM_SPI_PIN_MOSI = spiMosi;
+    PARAM_SPI_PIN_MISO = spiMiso;
+    PARAM_SPI_PIN_CS = spiCs;
+    setErrorStatus(Error::NoError);
     spi = new SPIClass(FSPI);
-    spi->begin(device->PARAM_SPI_CLK, device->PARAM_SPI_PIN_MISO, device->PARAM_SPI_PIN_MOSI, device->PARAM_SPI_PIN_CS);
+    spi->begin(spiClk, spiMiso, spiMosi, spiCs);
 
-    pinMode(device->PARAM_SPI_PIN_CS, OUTPUT);
-    pinMode(device->interuptPin, INPUT);
-    
+    pinMode(spiCs, OUTPUT);
+    pinMode(INT_PIN, INPUT);
 
-    if(readReg(device, ACC_CHIPID) == 0xFA){
-        readReg(device, ACC_SFRSET, 0xb6);
+    CHIP_ID = readRegister(ACC_CHIPID);
+
+    if(CHIP_ID == 0xFA){
+        writeRegister( ACC_SFRSET, 0xb6);
         delay(500);
-        readReg(device, ACC_RANGE, 0b0000011); // 2g
+        writeRegister(ACC_RANGE, 0b0000011); // 2g
         delay(10);
-        readReg(device, ACC_BW, 0x0d); // 500hz
+        writeRegister(ACC_BW, 0x0d); // 500hz
         delay(10);
-        readReg(device, ACC_DATA_EN, 0b00010000);
+        writeRegister(ACC_DATA_EN, 0b00010000);
         delay(10);
-        readReg(device, ACC_INT1, 0b00000001);
-        device->error_status = CONNECTED;
+        writeRegister(ACC_INT1, 0b00000001);
+        error_status = Error::Connected;
     }
-    else if (readReg(device, GYRO_CHIPID) == 0x0F){
-        readReg(device, GYRO_SFRSET, 0xB6);
+    else if (CHIP_ID == 0x0F){
+        writeRegister(GYRO_SFRSET, 0xB6);
         delay(1000);
-        readReg(device, GYRO_RANGE, 0x00); // range set to 2000°/s
+        writeRegister(GYRO_RANGE, 0x00); // range set to 2000°/s
         delay(10);
-        readReg(device, GYRO_BW, 0b00000011); // 400Hz
+        writeRegister(GYRO_BW, 0b00000011); // 400Hz
         delay(10);
-        readReg(device, GYRO_INT_EN0, 0x01); //new data int enable and auto-offset compensation
+        writeRegister(GYRO_INT_EN0, 0x01); //new data int enable and auto-offset compensation
         delay(10);
-        readReg(device, GYRO_INTMAP_1, 0b00000001);
+        writeRegister(GYRO_INTMAP_1, 0b00000001);
         delay(10);
-        device->error_status = CONNECTED;
+        error_status = Error::Connected;
     }
     else{
-        device->error_status = ERROR_WRONG_CHIP_ID;
+        error_status = Error::WrongChipID;
     }
     
 };
 
-bool BMI055::calibrate_gyro(){
-    readReg(&gyro, GYRO_SOC, B01000111);
-    delay(10);
-    //readReg(&gyro, GYRO_RANGE, 0x04);
-    delay(10);
-    readReg(&gyro, GYRO_FOC, B11000111);
-    delay(10);
-    readReg(&gyro, GYRO_FOC, B11101111);
-    delay(100);
-    readReg(&gyro, GYRO_RANGE, 0x00);
-
-    while (readReg(&gyro, GYRO_FOC) == B00101111);
-
-    return 1;
-};
-
-void BMI055::getGyro() {
-    int16_t temp_x, temp_y, temp_z;
-
-    //Reading angular rate 
-    temp_x = getXRotation();
-    temp_y = getYRotation(); 
-    temp_z = getZRotation();
-
-    
-    gyro.x = temp_x / 16.4f; //(sum_x / 20) ;
-    gyro.y = temp_y / 16.4f; //(sum_y / 20) ;
-    gyro.z = temp_z / 16.4f; //(sum_z / 20) ;
-    
-};
-
-void BMI055::getAccel() {
-    int16_t temp_x, temp_y, temp_z;
-
-    //Reading  
-    temp_x = getX();
-    temp_y = getY();
-    temp_z = getZ();
-
-    accel.x = temp_x ;//* 0.0653f ;
-    accel.y = temp_y ;//* 0.0653f ;
-    accel.z = temp_z ;//* 0.0653f ;
-    
-};
-
-bool BMI055::getRawSample(int seconds, int nbr){
-    int16_t temp_x[nbr], temp_y[nbr], temp_z[nbr];
-    int sum_x, sum_y, sum_z;
-
-    for (size_t i = 0; i < nbr; i++)
-    {
-        while (!digitalRead(accel.interuptPin));
-        
-        sum_x += (int16_t)(readReg(&accel, ACC_X_LSB)|readReg(&accel, ACC_X_MSB)<<8);
-        sum_y += (int16_t)(readReg(&accel, ACC_Y_LSB)|readReg(&accel, ACC_Y_MSB)<<8);
-        sum_z += (int16_t)(readReg(&accel, ACC_Z_LSB)|readReg(&accel, ACC_Z_MSB)<<8);
-
-        delay(10);
-    }
-
-    accel.avg_x = sum_x/nbr;
-    accel.avg_y = sum_y/nbr;
-    accel.avg_z = sum_z/nbr;
-
-    return 1;
-
-}
-
-void BMI055::calibrateDevice(int interval, deviceParam *device, int nbrPos){
-    const uint8_t SAMPLE_LENGTH = 10;
+void BMI055::getDataset(){
     uint32_t startMillis = millis();
     uint32_t actualMillis = 0;
-    uint16_t sampleRawLenght = 0, varianceLenght = 0;
-    int32_t sum_x = 0, sum_y = 0, sum_z = 0;
-    int16_t moy_x = 0, moy_y = 0, moy_z =0;
-    uint32_t var_x = 0, var_y = 0, var_z = 0;
-    uint64_t global_var[1500], global_var_sum, global_var_moy = 0;
-    bool isMoving;
+    
 
-    Serial.println(millis());
-    while (actualMillis < startMillis + interval)
+    while (actualMillis < startMillis + TOTAL_CALIBRATION_TIME)
     {
+        digitalWrite(LED_PIN, LOW);
         actualMillis = millis();
-        if(digitalRead(device->interuptPin))
+        if(digitalRead(INT_PIN))
         {
-            device->rawPos.x[sampleRawLenght] = getX();
-            device->rawPos.y[sampleRawLenght] = getY();
-            device->rawPos.z[sampleRawLenght] = getZ();
-            sampleRawLenght++;
-            
+            rawPos.x[rawPos.len] = getX();
+            rawPos.y[rawPos.len] = getY();
+            rawPos.z[rawPos.len] = getZ();
+            rawPos.len++;
+            digitalWrite(LED_PIN, HIGH);
         }
-        if(sampleRawLenght>10000) break;
+        if(rawPos.len>=10000) break;
     }
+}
+
+void BMI055::calibrateDevice(){
+    const uint16_t SAMPLE_LENGTH = 5;
+    uint32_t global_var[1000], global_var_sum = 0, global_var_moy[600];
+
     Serial.println(millis());
-    Serial.print(sampleRawLenght);
-    Serial.println(" samples -> Reading Finished -> Starting computation for mean");
-    for(int j = 5; j < sampleRawLenght-10; j=j+5){
-        sum_x = 0;
-        sum_y = 0;
-        sum_z = 0;
-        var_x = 0;
-        var_y = 0;
-        var_z = 0;
-        for(int i = j - 5; i < j+SAMPLE_LENGTH - 5; i++){
-            sum_x += device->rawPos.x[i];
-            sum_y += device->rawPos.y[i];
-            sum_z += device->rawPos.z[i];
-        }
-        moy_x = sum_x/SAMPLE_LENGTH;        
-        moy_y = sum_y/SAMPLE_LENGTH;
-        moy_z = sum_z/SAMPLE_LENGTH;
-        for (int i = j - 5; i < j+SAMPLE_LENGTH - 5; i++)
-        {
-            var_x += sq(device->rawPos.x[i] - moy_x);
-            var_y += sq(device->rawPos.y[i] - moy_y);
-            var_z += sq(device->rawPos.z[i] - moy_z);
-        }
-        var_x /= SAMPLE_LENGTH;
-        var_y /= SAMPLE_LENGTH;
-        var_z /= SAMPLE_LENGTH;
+    getDataset();
+    Serial.println(millis());
+    Serial.print("Reading Finished: ");
+    Serial.print(rawPos.len);
+    Serial.println(" samples"); 
+    Serial.println(rawPos.x.size());
+    uint16_t sampleRawLenght = rawPos.len;
 
+    int16_t moy_x[sampleRawLenght/SAMPLE_LENGTH], moy_y[sampleRawLenght/SAMPLE_LENGTH], moy_z[sampleRawLenght/SAMPLE_LENGTH];
+    uint32_t var_x[sampleRawLenght/SAMPLE_LENGTH], var_y[sampleRawLenght/SAMPLE_LENGTH], var_z[sampleRawLenght/SAMPLE_LENGTH];
+
+    calculateAverage(rawPos.x, sampleRawLenght, moy_x, SAMPLE_LENGTH);
+    calculateAverage(rawPos.y, sampleRawLenght, moy_y, SAMPLE_LENGTH);
+    calculateAverage(rawPos.z, sampleRawLenght, moy_z, SAMPLE_LENGTH);
+
+    //calculateVariance(rawPos.x, sampleRawLenght, moy_x, var_x, SAMPLE_LENGTH);
+    //calculateVariance(rawPos.y, sampleRawLenght, moy_y, var_y, SAMPLE_LENGTH);
+    //calculateVariance(rawPos.z, sampleRawLenght, moy_z, var_z, SAMPLE_LENGTH);
+
+    for (size_t i = 0; i < sampleRawLenght/SAMPLE_LENGTH; i++)
+    {
+        //global_var[i] = getGlobalVariance(var_x[i], var_y[i], var_z[i]);
+    }
+
+    //calculateAverage(var_x, sampleRawLenght/SAMPLE_LENGTH, global_var_moy, SAMPLE_LENGTH);
+
+    for (size_t i = 0; i < sampleRawLenght; i++)
+    {
+        //Serial.println(rawPos.x[i]);
+        //Serial.print(",");        
+        //Serial.println(moy_x[i/SAMPLE_LENGTH]);
+        //Serial.print(",");
+        //Serial.print(sq(var_x[i/SAMPLE_LENGTH]));
+        //Serial.print(",");
+        //Serial.print(0);
+        //Serial.println(",");
+
+        //Serial.print(device->rawPos.y[i]);
+        //Serial.print(",");
+        //Serial.print(moy_y[i/SAMPLE_LENGTH]);
+        //Serial.print(",");
+        //Serial.print(var_y[i/SAMPLE_LENGTH]);
+        //Serial.print(",");
+//
+        //Serial.print(device->rawPos.z[i]);
+        //Serial.print(",");
+        //Serial.print(moy_z[i/SAMPLE_LENGTH]);
+        //Serial.print(",");
+        //Serial.println(var_z[i/SAMPLE_LENGTH]);
+    }
+    
+    Serial.println("Finish fonction");
+    
+    /*
         global_var[j/5] = sq(var_x) + sq(var_y) + sq(var_z);
-
-        if(SAMPLE_LENGTH < j/5){
-            for (int i = j/5 - SAMPLE_LENGTH; i < j/5; i++)
+        if(j/5 > SAMPLE_LENGTH && j%5 == 0){
+            global_var_sum = 0;
+            uint16_t k = j/5;
+            
+            for (int i = k - 5; i < k + SAMPLE_LENGTH - 5; i++)
             {
                 global_var_sum += global_var[i];
-                varianceLenght = i;
             }
-            global_var_moy = global_var_sum/10;
-            global_var_sum = 0;            
+            //global_var_moy = global_var_sum/10;
+                      
         }
 
-        if (global_var_moy > 500000000)
+        if (global_var_moy[0] > 500000000)
         {
             isMoving = true;
+            if(wasMoving == false){
+                wasMoving = true;
+                numberOfPos++;
+            }
         }
-        else isMoving = false;
+        else {
+            isMoving = false;
+            wasMoving = false;
+            if (moy_x < device->offsetPos[numberOfPos].low.x)
+            {
+                //Serial.println("recode offset");
+                device->offsetPos[numberOfPos].low.x = moy_x;
+            }
+            if (moy_x > device->offsetPos[numberOfPos].high.x)
+            {
+                //Serial.println("recode offset");
+                device->offsetPos[numberOfPos].high.x = moy_x;
+            }
+        }
         
-        Serial.print(moy_x);
-        Serial.print(",");
-        Serial.print(moy_y);
-        Serial.print(",");
-        Serial.print(moy_z);
-        Serial.print(",");
-        Serial.print(global_var[j/5]);
-        Serial.print(",");
-        Serial.print(global_var_moy);
-        Serial.print(",");
-        Serial.println(isMoving);
+        //Serial.print(moy_x);
+        //Serial.print(",");
+        //Serial.print(moy_y);
+        //Serial.print(",");
+        //Serial.print(global_var_sum);
+        //Serial.print(",");
+        //Serial.print(global_var[j/5]);
+        //Serial.print(",");
+        //Serial.print(global_var_moy[j/5]);
+        //Serial.print(",");
+        //Serial.println(varianceLenght);
+
+    
+
+    try
+    {
+        calculateAverage(global_var, 30, global_var_moy, 10);
     }
+    catch(const char* errorMessage)
+    {
+        Serial.print("Error : " + String(errorMessage));
+    }
+
+    for (size_t i = 0; i < 1000 - 1; i++)
+    {
+        Serial.print(global_var[i]);
+        Serial.print(",");
+        Serial.println(global_var_moy[i/10]);
+    }*/
     
 
 /*    for(int i = 0; i < nbrPos; i++){
@@ -300,7 +314,7 @@ void BMI055::calibrateDevice(int interval, deviceParam *device, int nbrPos){
         Serial.println(sum_x);
         Serial.println("Sum computed");
         for(int i = 0; i < sampleRawLenght; i++){
-            //var_x += (temp_x[i] - (sum_x/sampleRawLenght)) * (temp_x[i] - (sum_x/sampleRawLenght));
+            var_x += (temp_x[i] - (sum_x/sampleRawLenght)) * (temp_x[i] - (sum_x/sampleRawLenght));
             //var_y += (temp_y[i] - (sum_y/sampleRawLenght)) * (temp_y[i] - (sum_y/sampleRawLenght));
             //var_z += (temp_z[i] - (sum_z/sampleRawLenght)) * (temp_z[i] - (sum_z/sampleRawLenght));
 
@@ -337,6 +351,59 @@ void BMI055::calibrateDevice(int interval, deviceParam *device, int nbrPos){
 
     device->isCalibrated = true;*/
 
+}
+
+void BMI055::calculateVariance(std::vector<int16_t, std::allocator<int16_t>> valueArray, uint16_t valueLength,int16_t averages[], uint32_t variances[], uint8_t sampleSize){
+    uint32_t variance = 0;
+    uint16_t sampleIndex = 0;
+
+    for (size_t i = 0; i < valueLength; i++)
+    {
+        variance += sq(valueArray[i] - averages[i/sampleSize]);
+
+        if ((i + 1) % sampleSize == 0)
+        {
+            variances[sampleIndex] = variance / sampleSize;
+            variance = 0;
+            sampleIndex++;
+        }
+    }
+    if (valueLength % sampleSize != 0)
+    {
+        variances[sampleIndex] = variance / (valueLength % sampleSize);
+    }
     
+    Serial.println(sampleIndex);
+}
+
+uint32_t BMI055::getGlobalVariance(uint32_t varianceX, uint32_t varianceY, uint32_t varianceZ){
+    return sqrt(sq(varianceX) + sq(varianceY) + sq(varianceZ));
+}
+
+void BMI055::calculateAverage(std::vector<int16_t, std::allocator<int16_t>> dataArray, uint16_t dataLength, int16_t averages[], uint16_t sampleSize) {
+    int32_t sum = 0;
+    int sampleIndex = 0;
+    Serial.println(dataArray.size());
+
+    for (size_t i = 0; i < dataArray.size(); i++) {
+
+        sum += dataArray[i];
+
+        if ((i + 1) % sampleSize == 0) {  // Calculez la moyenne tous les échantillons de `sampleSize` valeurs
+            averages[sampleIndex] = sum / sampleSize;
+            sum = 0;  // Réinitialisez la somme pour le prochain échantillon
+            sampleIndex++;
+        }
+    }
+
+    // Si le nombre total de valeurs n'est pas un multiple de `sampleSize`,
+    // calculez la moyenne des valeurs restantes
+    if (dataLength % sampleSize != 0) {
+        if ((dataLength % sampleSize) == 0) {
+            throw "Division by zero";  // Lancez une exception si sampleSize est de zéro
+        }
+        averages[sampleIndex] = sum / (int16_t(dataLength) % sampleSize);
+    }
+    Serial.println(sampleIndex);
 }
 

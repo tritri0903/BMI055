@@ -1,81 +1,120 @@
+#ifndef MYCLASS_H
+#define MYCLASS_H
 
 #include "Arduino.h"
+#include <vector>
 
-class BMI055
-{
-  public:
+enum class Error {
+    NoError,
+    NoAnswer,
+    WrongChipID,
+    Connected
+};
 
+class Offset {
+public:
+    Offset(uint16_t x_val = 0, uint16_t y_val = 0, uint16_t z_val = 0)
+        : x(x_val), y(y_val), z(z_val) {}
+
+    uint16_t x;
+    uint16_t y;
+    uint16_t z;
+};
+
+class OffsetPosition {
+public:
+    OffsetPosition(const Offset& low_val, const Offset& high_val)
+        : low(low_val), high(high_val) {}
+
+    Offset low;
+    Offset high;
+};
+
+class PosValue {
+public:
+    PosValue(size_t max_size = 1000)
+        : x(max_size), y(max_size), z(max_size) {};
+
+    std::vector<int16_t> x;
+    std::vector<int16_t> y;
+    std::vector<int16_t> z;
+
+    uint16_t len;
+};
+
+
+class BMI055 {
+public:
     BMI055(); // object initializer 
 
-    enum error{
-      NO_ERROR,
-      ERROR_NO_ANSWER,
-      ERROR_WRONG_CHIP_ID,
-      CONNECTED
-    };
+    void begin(uint8_t spiClk, uint8_t spiMosi, uint8_t spiMiso, uint8_t spiCs, uint32_t spiClkFreq = 100000);
+    void begin(uint8_t add);
 
-    struct offsetPosition
-    {
-        int x, y, z;
-    };
-
-    struct posValue
-    {
-      int16_t x[10000], y[10000], z[10000];
-    };
-    
-    
-
-    struct deviceParam
-    {
-      uint8_t PARAM_SPI_CLK = -1;
-      uint8_t PARAM_SPI_PIN_MOSI = -1;
-      uint8_t PARAM_SPI_PIN_MISO = -1;
-      uint8_t PARAM_SPI_PIN_CS = -1;
-      uint32_t PARAM_SPI_CLK_FREQ = 100000;
-
-      error error_status = NO_ERROR;
-
-      uint8_t dataRx;
-
-      offsetPosition offsetPos[4];
-      posValue rawPos;
-
-      bool isConnected;
-      bool isCalibrated = false;
-      bool posFinished = false;
-
-      float x, y, z;
-
-      float avg_x, avg_y, avg_z;
-
-      uint8_t interuptPin = 5;
-    } ;
-
-    deviceParam accel;
-    deviceParam gyro;
-
-    void initialize(deviceParam *device); // sensor startup and various other functions - you need to run this line of code for the sensor to work
-
-    void read_gyro(); // run this to read gyroscope data. gyroscopic data will be accessible in bno.gyro. x / y / z
-    void getAccel(); // run this to read accelerometer data. accelerometer data will be accessible in bno.accel. x / y / z
-
-    void getGyro();
-
-    bool calibrate_gyro();
-    void calibrateDevice(int interval, deviceParam *device,  int nbrPos);
+    void calibrateDevice();
 
     void avrg_reading();
     void accel_avrg_reading();
-
     bool getRawSample(int seconds, int nbr);
 
-  private:
-    int16_t getX();
-    int16_t getY();
-    int16_t getZ();
-    int16_t getXRotation();
-    int16_t getYRotation();
-    int16_t getZRotation();
-    uint8_t readReg(deviceParam *device, int reg, int data);
+    void setLedPin(uint8_t value) {
+        LED_PIN = value;
+        pinMode(LED_PIN, OUTPUT);
+    }
+
+    void setTotalCalibrationTime(uint16_t value) {
+        TOTAL_CALIBRATION_TIME = value;
+    }
+
+    void setErrorStatus(Error value){
+        error_status = value;
+    }
+
+    Error getErrorStatus(){
+        return error_status;
+    }
+
+private:
+  uint8_t CHIP_ID;
+  uint8_t PARAM_SPI_CLK;
+  uint8_t PARAM_SPI_PIN_MOSI;
+  uint8_t PARAM_SPI_PIN_MISO;
+  uint8_t PARAM_SPI_PIN_CS;
+  uint32_t PARAM_SPI_CLK_FREQ = 100000;
+
+  uint8_t LED_PIN = -1;
+  uint8_t INT_PIN = 5;
+  Error error_status = Error::NoError;
+  uint16_t TOTAL_CALIBRATION_TIME = 5000;
+  std::vector<OffsetPosition> offsetPos;
+  PosValue rawPos;
+  bool isConnected = false;
+  bool isCalibrated = false;
+  bool posFinished = false;
+  float x = 0.0f;
+  float y = 0.0f;
+  float z = 0.0f;
+  float avg_x = 0.0f;
+  float avg_y = 0.0f;
+  float avg_z = 0.0f;
+
+
+  int16_t getX();
+  int16_t getY();
+  int16_t getZ();
+  int16_t getXRotation();
+  int16_t getYRotation();
+  int16_t getZRotation();
+  uint8_t readRegister(int reg);
+  uint8_t writeRegister(int reg, int data);
+
+  void getDataset();
+
+  void calculateAverage(std::vector<int16_t, std::allocator<int16_t>> dataArray, uint16_t dataLength, uint32_t averages[], int32_t sampleSize);
+
+  void calculateAverage(std::vector<int16_t, std::allocator<int16_t>> dataArray, uint16_t dataLength, int16_t averages[], uint16_t sampleSize);
+
+  void calculateVariance(std::vector<int16_t, std::allocator<int16_t>> valueArray, uint16_t valueLength,int16_t averages[], uint32_t variances[], uint8_t sampleSize);
+  uint32_t getGlobalVariance(uint32_t varianceX, uint32_t varianceY, uint32_t varianceZ);
 };
+
+#endif
