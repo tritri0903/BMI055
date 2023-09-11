@@ -190,13 +190,12 @@ void BMI055::getDataset(vector<int16_t> &x, vector<int16_t> &y, vector<int16_t> 
                 z.resize(z.size() + 10, 0);
             }
         }
-        if(len>5000) break;
+        if(len>TOTAL_CALIBRATION_TIME) break;
     }
 }
 
 void BMI055::calibrateDevice(){
     const uint16_t SAMPLE_LENGTH = 5;
-    uint32_t global_var_sum = 0;
 
     vector<int16_t> x(TOTAL_CALIBRATION_TIME/2, 0);
     vector<int16_t> y(TOTAL_CALIBRATION_TIME/2, 0);
@@ -258,152 +257,6 @@ void BMI055::calibrateDevice(){
     }
     
     Serial.println("Finish fonction");
-    
-    /*
-        global_var[j/5] = sq(var_x) + sq(var_y) + sq(var_z);
-        if(j/5 > SAMPLE_LENGTH && j%5 == 0){
-            global_var_sum = 0;
-            uint16_t k = j/5;
-            
-            for (int i = k - 5; i < k + SAMPLE_LENGTH - 5; i++)
-            {
-                global_var_sum += global_var[i];
-            }
-            //global_var_moy = global_var_sum/10;
-                      
-        }
-
-        if (global_var_moy[0] > 500000000)
-        {
-            isMoving = true;
-            if(wasMoving == false){
-                wasMoving = true;
-                numberOfPos++;
-            }
-        }
-        else {
-            isMoving = false;
-            wasMoving = false;
-            if (moy_x < device->offsetPos[numberOfPos].low.x)
-            {
-                //Serial.println("recode offset");
-                device->offsetPos[numberOfPos].low.x = moy_x;
-            }
-            if (moy_x > device->offsetPos[numberOfPos].high.x)
-            {
-                //Serial.println("recode offset");
-                device->offsetPos[numberOfPos].high.x = moy_x;
-            }
-        }
-        
-        //Serial.print(moy_x);
-        //Serial.print(",");
-        //Serial.print(moy_y);
-        //Serial.print(",");
-        //Serial.print(global_var_sum);
-        //Serial.print(",");
-        //Serial.print(global_var[j/5]);
-        //Serial.print(",");
-        //Serial.print(global_var_moy[j/5]);
-        //Serial.print(",");
-        //Serial.println(varianceLenght);
-
-    
-
-    try
-    {
-        calculateAverage(global_var, 30, global_var_moy, 10);
-    }
-    catch(const char* errorMessage)
-    {
-        Serial.print("Error : " + String(errorMessage));
-    }
-
-    for (size_t i = 0; i < 1000 - 1; i++)
-    {
-        Serial.print(global_var[i]);
-        Serial.print(",");
-        Serial.println(global_var_moy[i/10]);
-    }*/
-    
-
-/*    for(int i = 0; i < nbrPos; i++){
-        startMillis = millis();
-
-        for(int i = 0; i < sampleRawLenght; i++){
-            temp_x[i] = 0;
-            temp_y[i] = 0;
-            temp_z[i] = 0;
-        }
-
-        Serial.println(sum_x);
-        Serial.println("Sum computed");
-        for(int i = 0; i < sampleRawLenght; i++){
-            var_x += (temp_x[i] - (sum_x/sampleRawLenght)) * (temp_x[i] - (sum_x/sampleRawLenght));
-            //var_y += (temp_y[i] - (sum_y/sampleRawLenght)) * (temp_y[i] - (sum_y/sampleRawLenght));
-            //var_z += (temp_z[i] - (sum_z/sampleRawLenght)) * (temp_z[i] - (sum_z/sampleRawLenght));
-
-            var_x += temp_x[i] * temp_x[i];
-            var_y += temp_y[i] * temp_y[i];
-            var_z += temp_z[i] * temp_z[i];
-        }
-
-        int32_t varx = var_x/sampleRawLenght - sum_x/sampleRawLenght;
-        int32_t vary = var_y/sampleRawLenght - sum_y/sampleRawLenght;
-        int32_t varz = var_z/sampleRawLenght - sum_z/sampleRawLenght;
-
-        global_var = sqrt(varx*varx + vary*vary + varz*varz);
-        
-
-        Serial.print(var_x);
-        Serial.print(", ");
-        Serial.print(var_y);
-        Serial.print(", ");
-        Serial.print(var_z);
-
-        Serial.print(" - ");
-        Serial.println(global_var);    
-        
-        
-        device->offsetPos[i].x = (int32_t)sum_x/sampleRawLenght;
-        device->offsetPos[i].y = (int32_t)sum_y/sampleRawLenght;
-        device->offsetPos[i].z = (int32_t)sum_z/sampleRawLenght;
-        Serial.print(" x offset: ");
-        Serial.println(device->offsetPos[i].x);
-        Serial.println("Turn");
-        delay(5000);
-    }
-
-    device->isCalibrated = true;*/
-
-}
-
-void BMI055::calculateVariance(vector<int16_t> &valueArray, uint16_t valueLength,int16_t averages[], vector<uint32_t> &variances, uint8_t sampleSize){
-    uint32_t variance = 0;
-    uint16_t sampleIndex = 0;
-    //Serial.println(valueArray.size());
-
-    for (size_t i = 0; i < valueLength; i++)
-    {
-        variance += sq(valueArray[i] - averages[i/sampleSize]);
-
-        if ((i + 1) % sampleSize == 0)
-        {
-            variances[sampleIndex] = variance / sampleSize;
-            variance = 0;
-            sampleIndex++;
-        }
-    }
-    if (valueLength % sampleSize != 0)
-    {
-        variances[sampleIndex] = variance / (valueLength % sampleSize);
-    }
-    
-    //Serial.println(sampleIndex);
-}
-
-uint32_t BMI055::getGlobalVariance(uint32_t varianceX, uint32_t varianceY, uint32_t varianceZ){
-    return sqrt(sq(varianceX) + sq(varianceY) + sq(varianceZ));
 }
 
 void BMI055::calculateAverage(vector<int16_t> &dataArray, uint16_t dataLength, int16_t averages[], uint16_t sampleSize) {
@@ -429,7 +282,6 @@ void BMI055::calculateAverage(vector<int16_t> &dataArray, uint16_t dataLength, i
         }
         averages[sampleIndex] = sum / (int16_t(dataLength) % sampleSize);
     }
-    //Serial.println(sampleIndex);
 }
 
 void BMI055::calculateAverage(vector<uint32_t> &dataArray, uint16_t dataLength,vector<uint32_t> &averages, uint16_t sampleSize) {
@@ -455,6 +307,29 @@ void BMI055::calculateAverage(vector<uint32_t> &dataArray, uint16_t dataLength,v
         }
         averages[sampleIndex] = sum / (int16_t(dataLength) % sampleSize);
     }
-    Serial.println(sampleIndex);
 }
 
+void BMI055::calculateVariance(vector<int16_t> &valueArray, uint16_t valueLength,int16_t averages[], vector<uint32_t> &variances, uint8_t sampleSize){
+    uint32_t variance = 0;
+    uint16_t sampleIndex = 0;
+
+    for (size_t i = 0; i < valueLength; i++)
+    {
+        variance += sq(valueArray[i] - averages[i/sampleSize]);
+
+        if ((i + 1) % sampleSize == 0)
+        {
+            variances[sampleIndex] = variance / sampleSize;
+            variance = 0;
+            sampleIndex++;
+        }
+    }
+    if (valueLength % sampleSize != 0)
+    {
+        variances[sampleIndex] = variance / (valueLength % sampleSize);
+    }
+}
+
+uint32_t BMI055::getGlobalVariance(uint32_t varianceX, uint32_t varianceY, uint32_t varianceZ){
+    return sqrt(sq(varianceX) + sq(varianceY) + sq(varianceZ));
+}
