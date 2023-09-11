@@ -119,7 +119,7 @@ private:
 
   void calculateAverage(vector<int16_t> &dataArray, uint16_t dataLength, int16_t averages[], uint16_t sampleSize);
 
-  void calculateVariance(vector<int16_t> &valueArray, uint16_t valueLength,int16_t averages[], uint32_t variances[], uint8_t sampleSize);
+  void calculateVariance(vector<int16_t> &valueArray, uint16_t valueLength,int16_t averages[], vector<uint32_t> &variances, uint8_t sampleSize);
   
   uint32_t getGlobalVariance(uint32_t varianceX, uint32_t varianceY, uint32_t varianceZ);
 };

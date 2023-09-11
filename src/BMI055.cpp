@@ -212,13 +212,13 @@ void BMI055::calibrateDevice(){
     uint16_t sampleRawLenght = len;
 
     int16_t moy_x[x.size()/SAMPLE_LENGTH], moy_y[y.size()/SAMPLE_LENGTH], moy_z[z.size()/SAMPLE_LENGTH];
-    uint32_t var_x[x.size()/SAMPLE_LENGTH], var_y[y.size()/SAMPLE_LENGTH], var_z[z.size()/SAMPLE_LENGTH];
+    vector<uint32_t> var_x(x.size()/SAMPLE_LENGTH), var_y(y.size()/SAMPLE_LENGTH), var_z(z.size()/SAMPLE_LENGTH);
 
     calculateAverage(x, sampleRawLenght, moy_x, SAMPLE_LENGTH);
     calculateAverage(y, sampleRawLenght, moy_y, SAMPLE_LENGTH);
     calculateAverage(z, sampleRawLenght, moy_z, SAMPLE_LENGTH);
 
-    calculateVariance(x, sampleRawLenght, moy_x, var_x, SAMPLE_LENGTH);
+    calculateVariance(x, x.size(), moy_x, var_x, SAMPLE_LENGTH);
     //calculateVariance(rawPos.y, sampleRawLenght, moy_y, var_y, SAMPLE_LENGTH);
     //calculateVariance(rawPos.z, sampleRawLenght, moy_z, var_z, SAMPLE_LENGTH);
 
@@ -375,9 +375,10 @@ void BMI055::calibrateDevice(){
 
 }
 
-void BMI055::calculateVariance(vector<int16_t> &valueArray, uint16_t valueLength,int16_t averages[], uint32_t variances[], uint8_t sampleSize){
+void BMI055::calculateVariance(vector<int16_t> &valueArray, uint16_t valueLength,int16_t averages[], vector<uint32_t> &variances, uint8_t sampleSize){
     uint32_t variance = 0;
     uint16_t sampleIndex = 0;
+    //Serial.println(valueArray.size());
 
     for (size_t i = 0; i < valueLength; i++)
     {
@@ -405,7 +406,6 @@ uint32_t BMI055::getGlobalVariance(uint32_t varianceX, uint32_t varianceY, uint3
 void BMI055::calculateAverage(vector<int16_t> &dataArray, uint16_t dataLength, int16_t averages[], uint16_t sampleSize) {
     int32_t sum = 0;
     int sampleIndex = 0;
-    Serial.println(dataArray.size());
 
     for (size_t i = 0; i < dataLength; i++) {
 
@@ -426,6 +426,6 @@ void BMI055::calculateAverage(vector<int16_t> &dataArray, uint16_t dataLength, i
         }
         averages[sampleIndex] = sum / (int16_t(dataLength) % sampleSize);
     }
-    Serial.println(sampleIndex);
+    //Serial.println(sampleIndex);
 }
 
