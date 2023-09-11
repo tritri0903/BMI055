@@ -115,7 +115,7 @@ private:
 
   void getDataset(vector<int16_t> &x, vector<int16_t> &y, vector<int16_t> &z, uint16_t &len);
 
-  void calculateAverage(std::vector<int16_t, std::allocator<int16_t>> dataArray, uint16_t dataLength, uint32_t averages[], int32_t sampleSize);
+  void calculateAverage(vector<uint32_t> &dataArray, uint16_t dataLength,vector<uint32_t> &averages, uint16_t sampleSize);
 
   void calculateAverage(vector<int16_t> &dataArray, uint16_t dataLength, int16_t averages[], uint16_t sampleSize);
 

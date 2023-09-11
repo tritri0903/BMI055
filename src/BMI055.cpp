@@ -185,9 +185,9 @@ void BMI055::getDataset(vector<int16_t> &x, vector<int16_t> &y, vector<int16_t> 
             catch(const std::exception& e)
             {
                 Serial.println(e.what());
-                x.resize(x.size() + 100, 0);
-                y.resize(y.size() + 100, 0);
-                z.resize(z.size() + 100, 0);
+                x.resize(x.size() + 10, 0);
+                y.resize(y.size() + 10, 0);
+                z.resize(z.size() + 10, 0);
             }
         }
         if(len>5000) break;
@@ -196,11 +196,11 @@ void BMI055::getDataset(vector<int16_t> &x, vector<int16_t> &y, vector<int16_t> 
 
 void BMI055::calibrateDevice(){
     const uint16_t SAMPLE_LENGTH = 5;
-    uint32_t global_var[1000], global_var_sum = 0, global_var_moy[600];
+    uint32_t global_var_sum = 0;
 
-    vector<int16_t> x(4000, 0);
-    vector<int16_t> y(4000, 0);
-    vector<int16_t> z(4000, 0);
+    vector<int16_t> x(TOTAL_CALIBRATION_TIME/2, 0);
+    vector<int16_t> y(TOTAL_CALIBRATION_TIME/2, 0);
+    vector<int16_t> z(TOTAL_CALIBRATION_TIME/2, 0);
     uint16_t len;
 
     Serial.println(millis());
@@ -209,36 +209,39 @@ void BMI055::calibrateDevice(){
     Serial.print("Reading Finished: ");
     Serial.print(len);
     Serial.println(" samples");
-    uint16_t sampleRawLenght = len;
 
     int16_t moy_x[x.size()/SAMPLE_LENGTH], moy_y[y.size()/SAMPLE_LENGTH], moy_z[z.size()/SAMPLE_LENGTH];
     vector<uint32_t> var_x(x.size()/SAMPLE_LENGTH), var_y(y.size()/SAMPLE_LENGTH), var_z(z.size()/SAMPLE_LENGTH);
 
-    calculateAverage(x, sampleRawLenght, moy_x, SAMPLE_LENGTH);
-    calculateAverage(y, sampleRawLenght, moy_y, SAMPLE_LENGTH);
-    calculateAverage(z, sampleRawLenght, moy_z, SAMPLE_LENGTH);
+    calculateAverage(x, len, moy_x, SAMPLE_LENGTH);
+    calculateAverage(y, len, moy_y, SAMPLE_LENGTH);
+    calculateAverage(z, len, moy_z, SAMPLE_LENGTH);
 
     calculateVariance(x, x.size(), moy_x, var_x, SAMPLE_LENGTH);
-    //calculateVariance(rawPos.y, sampleRawLenght, moy_y, var_y, SAMPLE_LENGTH);
-    //calculateVariance(rawPos.z, sampleRawLenght, moy_z, var_z, SAMPLE_LENGTH);
+    calculateVariance(y, y.size(), moy_y, var_y, SAMPLE_LENGTH);
+    calculateVariance(z, z.size(), moy_z, var_z, SAMPLE_LENGTH);
 
-    for (size_t i = 0; i < sampleRawLenght/SAMPLE_LENGTH; i++)
+    vector<uint32_t> global_var(var_x.size(), 0);
+
+    for (size_t i = 0; i < var_x.size(); i++)
     {
-        //global_var[i] = getGlobalVariance(var_x[i], var_y[i], var_z[i]);
+        global_var[i] = getGlobalVariance(var_x[i], var_y[i], var_z[i]);
     }
 
-    //calculateAverage(var_x, sampleRawLenght/SAMPLE_LENGTH, global_var_moy, SAMPLE_LENGTH);
+    vector<uint32_t> global_var_moy(global_var.size()/5 + 1, 0);
 
-    for (size_t i = 0; i < sampleRawLenght; i++)
+    calculateAverage(global_var, global_var.size(), global_var_moy, SAMPLE_LENGTH);
+
+    for (size_t i = 0; i < len; i++)
     {
         Serial.print(x[i]);
         Serial.print(",");        
         Serial.print(moy_x[i/SAMPLE_LENGTH]);
         Serial.print(",");
-        Serial.print(sq(var_x[i/SAMPLE_LENGTH]));
+        Serial.print(global_var[i/SAMPLE_LENGTH]);
         Serial.print(",");
-        //Serial.print(0);
-        //Serial.println(",");
+        Serial.print(global_var_moy[i/25]);
+        Serial.print(",");
 
         Serial.print(y[i]);
         Serial.print(",");
@@ -396,7 +399,7 @@ void BMI055::calculateVariance(vector<int16_t> &valueArray, uint16_t valueLength
         variances[sampleIndex] = variance / (valueLength % sampleSize);
     }
     
-    Serial.println(sampleIndex);
+    //Serial.println(sampleIndex);
 }
 
 uint32_t BMI055::getGlobalVariance(uint32_t varianceX, uint32_t varianceY, uint32_t varianceZ){
@@ -427,5 +430,31 @@ void BMI055::calculateAverage(vector<int16_t> &dataArray, uint16_t dataLength, i
         averages[sampleIndex] = sum / (int16_t(dataLength) % sampleSize);
     }
     //Serial.println(sampleIndex);
+}
+
+void BMI055::calculateAverage(vector<uint32_t> &dataArray, uint16_t dataLength,vector<uint32_t> &averages, uint16_t sampleSize) {
+    int32_t sum = 0;
+    int sampleIndex = 0;
+
+    for (size_t i = 0; i < dataLength; i++) {
+
+        sum += dataArray[i];
+
+        if ((i + 1) % sampleSize == 0) {  // Calculez la moyenne tous les échantillons de `sampleSize` valeurs
+            averages[sampleIndex] = sum / sampleSize;
+            sum = 0;  // Réinitialisez la somme pour le prochain échantillon
+            sampleIndex++;
+        }
+    }
+
+    // Si le nombre total de valeurs n'est pas un multiple de `sampleSize`,
+    // calculez la moyenne des valeurs restantes
+    if (dataLength % sampleSize != 0) {
+        if ((dataLength % sampleSize) == 0) {
+            throw "Division by zero";  // Lancez une exception si sampleSize est de zéro
+        }
+        averages[sampleIndex] = sum / (int16_t(dataLength) % sampleSize);
+    }
+    Serial.println(sampleIndex);
 }
 
