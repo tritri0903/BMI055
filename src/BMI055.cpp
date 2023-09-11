@@ -87,15 +87,22 @@ uint8_t BMI055::writeRegister(int reg, int data = 0) {
 };
 
 int16_t BMI055::getX(){
-    return (int16_t)(writeRegister(ACC_X_LSB)|writeRegister(ACC_X_MSB)<<8);
-
+    if(CHIP_ID == 0xFA)
+        return (int16_t)(writeRegister(ACC_X_LSB)|writeRegister(ACC_X_MSB)<<8);
+    else
+        return (int16_t)(readRegister(GYRO_X_LSB)|readRegister(GYRO_X_MSB)<<8);
 };
 int16_t BMI055::getY(){
-    return (int16_t)(readRegister(ACC_Y_LSB)|readRegister(ACC_Y_MSB)<<8);
-
+    if(CHIP_ID == 0xFA)
+        return (int16_t)(readRegister(ACC_Y_LSB)|readRegister(ACC_Y_MSB)<<8);
+    else
+        return (int16_t)(readRegister(GYRO_Y_LSB)|readRegister(GYRO_Y_MSB)<<8); 
 };
 int16_t BMI055::getZ(){
-    return (int16_t)(readRegister(ACC_Z_LSB)|readRegister(ACC_Z_MSB)<<8);
+    if(CHIP_ID == 0xFA)
+        return (int16_t)(readRegister(ACC_Z_LSB)|readRegister(ACC_Z_MSB)<<8);
+    else
+        return (int16_t)(readRegister(GYRO_Z_LSB)|readRegister(GYRO_Z_MSB)<<8);
 };
 
 int16_t BMI055::getXRotation(){
@@ -155,10 +162,11 @@ void BMI055::begin(uint8_t spiClk, uint8_t spiMosi, uint8_t spiMiso, uint8_t spi
     
 };
 
-void BMI055::getDataset(){
+void BMI055::getDataset(vector<int16_t> &x, vector<int16_t> &y, vector<int16_t> &z, uint16_t &len){
     uint32_t startMillis = millis();
     uint32_t actualMillis = 0;
-    
+
+    len = 0;
 
     while (actualMillis < startMillis + TOTAL_CALIBRATION_TIME)
     {
@@ -166,13 +174,23 @@ void BMI055::getDataset(){
         actualMillis = millis();
         if(digitalRead(INT_PIN))
         {
-            rawPos.x[rawPos.len] = getX();
-            rawPos.y[rawPos.len] = getY();
-            rawPos.z[rawPos.len] = getZ();
-            rawPos.len++;
-            digitalWrite(LED_PIN, HIGH);
+            try
+            {
+                x.at(len) = getX();
+                y.at(len) = getY();
+                z.at(len) = getZ();
+                len++;
+                digitalWrite(LED_PIN, HIGH);
+            }
+            catch(const std::exception& e)
+            {
+                Serial.println(e.what());
+                x.resize(x.size() + 100, 0);
+                y.resize(y.size() + 100, 0);
+                z.resize(z.size() + 100, 0);
+            }
         }
-        if(rawPos.len>=10000) break;
+        if(len>5000) break;
     }
 }
 
@@ -180,23 +198,27 @@ void BMI055::calibrateDevice(){
     const uint16_t SAMPLE_LENGTH = 5;
     uint32_t global_var[1000], global_var_sum = 0, global_var_moy[600];
 
+    vector<int16_t> x(4000, 0);
+    vector<int16_t> y(4000, 0);
+    vector<int16_t> z(4000, 0);
+    uint16_t len;
+
     Serial.println(millis());
-    getDataset();
+    getDataset(x, y, z, len);
     Serial.println(millis());
     Serial.print("Reading Finished: ");
-    Serial.print(rawPos.len);
-    Serial.println(" samples"); 
-    Serial.println(rawPos.x.size());
-    uint16_t sampleRawLenght = rawPos.len;
+    Serial.print(len);
+    Serial.println(" samples");
+    uint16_t sampleRawLenght = len;
 
-    int16_t moy_x[sampleRawLenght/SAMPLE_LENGTH], moy_y[sampleRawLenght/SAMPLE_LENGTH], moy_z[sampleRawLenght/SAMPLE_LENGTH];
-    uint32_t var_x[sampleRawLenght/SAMPLE_LENGTH], var_y[sampleRawLenght/SAMPLE_LENGTH], var_z[sampleRawLenght/SAMPLE_LENGTH];
+    int16_t moy_x[x.size()/SAMPLE_LENGTH], moy_y[y.size()/SAMPLE_LENGTH], moy_z[z.size()/SAMPLE_LENGTH];
+    uint32_t var_x[x.size()/SAMPLE_LENGTH], var_y[y.size()/SAMPLE_LENGTH], var_z[z.size()/SAMPLE_LENGTH];
 
-    calculateAverage(rawPos.x, sampleRawLenght, moy_x, SAMPLE_LENGTH);
-    calculateAverage(rawPos.y, sampleRawLenght, moy_y, SAMPLE_LENGTH);
-    calculateAverage(rawPos.z, sampleRawLenght, moy_z, SAMPLE_LENGTH);
+    calculateAverage(x, sampleRawLenght, moy_x, SAMPLE_LENGTH);
+    calculateAverage(y, sampleRawLenght, moy_y, SAMPLE_LENGTH);
+    calculateAverage(z, sampleRawLenght, moy_z, SAMPLE_LENGTH);
 
-    //calculateVariance(rawPos.x, sampleRawLenght, moy_x, var_x, SAMPLE_LENGTH);
+    calculateVariance(x, sampleRawLenght, moy_x, var_x, SAMPLE_LENGTH);
     //calculateVariance(rawPos.y, sampleRawLenght, moy_y, var_y, SAMPLE_LENGTH);
     //calculateVariance(rawPos.z, sampleRawLenght, moy_z, var_z, SAMPLE_LENGTH);
 
@@ -209,25 +231,25 @@ void BMI055::calibrateDevice(){
 
     for (size_t i = 0; i < sampleRawLenght; i++)
     {
-        //Serial.println(rawPos.x[i]);
-        //Serial.print(",");        
-        //Serial.println(moy_x[i/SAMPLE_LENGTH]);
-        //Serial.print(",");
-        //Serial.print(sq(var_x[i/SAMPLE_LENGTH]));
-        //Serial.print(",");
+        Serial.print(x[i]);
+        Serial.print(",");        
+        Serial.print(moy_x[i/SAMPLE_LENGTH]);
+        Serial.print(",");
+        Serial.print(sq(var_x[i/SAMPLE_LENGTH]));
+        Serial.print(",");
         //Serial.print(0);
         //Serial.println(",");
 
-        //Serial.print(device->rawPos.y[i]);
-        //Serial.print(",");
-        //Serial.print(moy_y[i/SAMPLE_LENGTH]);
-        //Serial.print(",");
+        Serial.print(y[i]);
+        Serial.print(",");
+        Serial.print(moy_y[i/SAMPLE_LENGTH]);
+        Serial.print(",");
         //Serial.print(var_y[i/SAMPLE_LENGTH]);
         //Serial.print(",");
-//
-        //Serial.print(device->rawPos.z[i]);
-        //Serial.print(",");
-        //Serial.print(moy_z[i/SAMPLE_LENGTH]);
+        //
+        Serial.print(z[i]);
+        Serial.print(",");
+        Serial.println(moy_z[i/SAMPLE_LENGTH]);
         //Serial.print(",");
         //Serial.println(var_z[i/SAMPLE_LENGTH]);
     }
@@ -353,7 +375,7 @@ void BMI055::calibrateDevice(){
 
 }
 
-void BMI055::calculateVariance(std::vector<int16_t, std::allocator<int16_t>> valueArray, uint16_t valueLength,int16_t averages[], uint32_t variances[], uint8_t sampleSize){
+void BMI055::calculateVariance(vector<int16_t> &valueArray, uint16_t valueLength,int16_t averages[], uint32_t variances[], uint8_t sampleSize){
     uint32_t variance = 0;
     uint16_t sampleIndex = 0;
 
@@ -380,12 +402,12 @@ uint32_t BMI055::getGlobalVariance(uint32_t varianceX, uint32_t varianceY, uint3
     return sqrt(sq(varianceX) + sq(varianceY) + sq(varianceZ));
 }
 
-void BMI055::calculateAverage(std::vector<int16_t, std::allocator<int16_t>> dataArray, uint16_t dataLength, int16_t averages[], uint16_t sampleSize) {
+void BMI055::calculateAverage(vector<int16_t> &dataArray, uint16_t dataLength, int16_t averages[], uint16_t sampleSize) {
     int32_t sum = 0;
     int sampleIndex = 0;
     Serial.println(dataArray.size());
 
-    for (size_t i = 0; i < dataArray.size(); i++) {
+    for (size_t i = 0; i < dataLength; i++) {
 
         sum += dataArray[i];
 

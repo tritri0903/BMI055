@@ -4,6 +4,8 @@
 #include "Arduino.h"
 #include <vector>
 
+using namespace std;
+
 enum class Error {
     NoError,
     NoAnswer,
@@ -35,9 +37,9 @@ public:
     PosValue(size_t max_size = 1000)
         : x(max_size), y(max_size), z(max_size) {};
 
-    std::vector<int16_t> x;
-    std::vector<int16_t> y;
-    std::vector<int16_t> z;
+    vector<int16_t> x;
+    vector<int16_t> y;
+    vector<int16_t> z;
 
     uint16_t len;
 };
@@ -48,7 +50,7 @@ public:
     BMI055(); // object initializer 
 
     void begin(uint8_t spiClk, uint8_t spiMosi, uint8_t spiMiso, uint8_t spiCs, uint32_t spiClkFreq = 100000);
-    void begin(uint8_t add);
+    void begin(uint8_t I2Cadd);
 
     void calibrateDevice();
 
@@ -59,6 +61,11 @@ public:
     void setLedPin(uint8_t value) {
         LED_PIN = value;
         pinMode(LED_PIN, OUTPUT);
+    }
+
+    void setInteruptPin(uint8_t value){
+      INT_PIN = value;
+      pinMode(INT_PIN, INPUT);
     }
 
     void setTotalCalibrationTime(uint16_t value) {
@@ -87,12 +94,11 @@ private:
   uint16_t TOTAL_CALIBRATION_TIME = 5000;
   std::vector<OffsetPosition> offsetPos;
   PosValue rawPos;
+
   bool isConnected = false;
   bool isCalibrated = false;
   bool posFinished = false;
-  float x = 0.0f;
-  float y = 0.0f;
-  float z = 0.0f;
+
   float avg_x = 0.0f;
   float avg_y = 0.0f;
   float avg_z = 0.0f;
@@ -107,13 +113,14 @@ private:
   uint8_t readRegister(int reg);
   uint8_t writeRegister(int reg, int data);
 
-  void getDataset();
+  void getDataset(vector<int16_t> &x, vector<int16_t> &y, vector<int16_t> &z, uint16_t &len);
 
   void calculateAverage(std::vector<int16_t, std::allocator<int16_t>> dataArray, uint16_t dataLength, uint32_t averages[], int32_t sampleSize);
 
-  void calculateAverage(std::vector<int16_t, std::allocator<int16_t>> dataArray, uint16_t dataLength, int16_t averages[], uint16_t sampleSize);
+  void calculateAverage(vector<int16_t> &dataArray, uint16_t dataLength, int16_t averages[], uint16_t sampleSize);
 
-  void calculateVariance(std::vector<int16_t, std::allocator<int16_t>> valueArray, uint16_t valueLength,int16_t averages[], uint32_t variances[], uint8_t sampleSize);
+  void calculateVariance(vector<int16_t> &valueArray, uint16_t valueLength,int16_t averages[], uint32_t variances[], uint8_t sampleSize);
+  
   uint32_t getGlobalVariance(uint32_t varianceX, uint32_t varianceY, uint32_t varianceZ);
 };
 
