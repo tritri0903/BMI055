@@ -43,8 +43,8 @@ BMI055 gyro;
 
 void setup() {
   // Initialize the sensors
-  accel.initialize(SPI_CLK, SPI_MOSI, SPI_MISO, SPI_ACC_NSC, SPI_CLK_FREQ);
-  gyro.initialize(SPI_CLK, SPI_MOSI, SPI_MISO, SPI_ACC_NSC, SPI_CLK_FREQ);
+  accel.begin(SPI_CLK, SPI_MOSI, SPI_MISO, SPI_ACC_NSC, SPI_CLK_FREQ);
+  gyro.begin(SPI_CLK, SPI_MOSI, SPI_MISO, SPI_ACC_NSC, SPI_CLK_FREQ);
 }
 
 void loop() {
