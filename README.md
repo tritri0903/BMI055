@@ -59,3 +59,5 @@ void loop() {
 ## Documentation
 
 For comprehensive documentation detailing the library's functions and classes, please refer to the [API documentation](#) (documentation not available yet).
+
+[Link](https://d1wqtxts1xzle7.cloudfront.net/56549933/a_robust_and_easy_to_implement_method_for_imu_calibration-libre.pdf?1526170383=&response-content-disposition=inline%3B+filename%3DA_Robust_and_Easy_to_Implement_Method_fo.pdf&Expires=1696416050&Signature=Hq0shx3OyRK6VLfaZVdFGqdtFtRwn-UuiLORjgDrwywz4vMlT4CPhrsQoWGtX7FKo8sVGlH311XDt1wsQZ9W3jidDavPmXZDb~bQnKH80v8KrFdb2I7EPK-TZ0mE2LUefluYd8J3ROBqOKbl0Itxv3FbCnJsH9MdU-4xe9jnYPCmHlEo12fOj13AEZphJ2AqnEPxYup4hpgvhz00KzG~fxDW9a-bP2ixY-gR31FBkNBRooFg6Z3OOFnZz0~LdNr1zfwmSDoWZHsPYIJRpQ9X1Ufu9QVBCA7bGXVufuhTyHBwBoUPvqKDchEuSA9gIWPz1JwIgAHSHC2AAGifVbLKQg__&Key-Pair-Id=APKAJLOHF5GGSLRBV4ZA) to the paper used for the calibration technique.
