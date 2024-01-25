@@ -1,12 +1,12 @@
 #ifndef _BMI055_H
 #define _BMI055_H
 
-#include "Arduino.h"
-#include <vector>
+#include "esp32-hal.h"
 
 #define BMI055_ACC_ADDR     0x30
 #define BMI055_GYRO_ADDR    0xd0
 
+/********************ACC REGISTER VALUES *****************/
 #define ACC_CHIPID          0x00
 #define ACC_X_LSB           0x02
 #define ACC_X_MSB           0x03
@@ -14,12 +14,28 @@
 #define ACC_Y_MSB           0x05
 #define ACC_Z_LSB           0x06
 #define ACC_Z_MSB           0x07
+#define ACC_TEMP            0x08
 #define ACC_RANGE           0x0f
 #define ACC_BW              0x10
 #define ACC_SFRSET          0x14
 #define ACC_OFC_CTRL        0x36
 #define ACC_DATA_EN         0x17
 #define ACC_INT1            0x1A
+
+/*******************ACC CONFIGURATION VALUES *************/
+#define ACC_RANGE_2G        0x03
+#define ACC_RANGE_4G        0x04
+#define ACC_RANGE_8G        0x08
+#define ACC_RANGE_16G       0x0C
+
+#define ACC_OFC_CUTOFF_1HZ  0
+#define ACC_OFC_CUTOFF_10HZ 1
+#define ACC_OFC_AXE_X       32
+#define ACC_OFC_AXE_Y       64
+#define ACC_OFC_AXE_Z       96
+#define ACC_OFC_SLOW_X      1
+#define ACC_OFC_SLOW_Y      2
+#define ACC_OFC_SLOW_Z      4
 
 #define GYRO_CHIPID         0x00
 #define GYRO_X_LSB          0x02
@@ -65,6 +81,7 @@ public:
     void beginSPI(uint8_t spiClk, uint8_t spiMosi, uint8_t spiMiso, uint8_t spiCs, uint32_t spiClkFreq = 100000);
     void beginI2C(uint8_t I2Cadd);
 
+    void getAcceleration(int16_t* ax, int16_t* ay, int16_t* az);
     int16_t getAccelerationX();
     int16_t getAccelerationY();
     int16_t getAccelerationZ();
