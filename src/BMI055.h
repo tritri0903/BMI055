@@ -19,6 +19,10 @@
 #define ACC_BW              0x10
 #define ACC_SFRSET          0x14
 #define ACC_OFC_CTRL        0x36
+#define ACC_OFC_OFFSET      0x37
+#define ACC_OFFSET_X        0x38
+#define ACC_OFFSET_Y        0x39
+#define ACC_OFFSET_Z        0x3A
 #define ACC_DATA_EN         0x17
 #define ACC_INT1            0x1A
 
@@ -28,6 +32,15 @@
 #define ACC_RANGE_8G        0x08
 #define ACC_RANGE_16G       0x0C
 
+#define ACC_BW_7_81         0x08
+#define ACC_BW_15_63        0x09
+#define ACC_BW_31_25        0x0A
+#define ACC_BW_62_5         0x0B
+#define ACC_BW_125          0x0C
+#define ACC_BW_250          0x0D
+#define ACC_BW_500          0x0E
+#define ACC_BW_1000         0x0F
+
 #define ACC_OFC_CUTOFF_1HZ  0
 #define ACC_OFC_CUTOFF_10HZ 1
 #define ACC_OFC_AXE_X       32
@@ -36,6 +49,10 @@
 #define ACC_OFC_SLOW_X      1
 #define ACC_OFC_SLOW_Y      2
 #define ACC_OFC_SLOW_Z      4
+
+#define ACC_OFC_OFFSET_TARGET_X    1
+#define ACC_OFC_OFFSET_TARGET_Y    3
+#define ACC_OFC_OFFSET_TARGET_Z    5
 
 #define GYRO_CHIPID         0x00
 #define GYRO_X_LSB          0x02
@@ -81,6 +98,11 @@ public:
     void beginSPI(uint8_t spiClk, uint8_t spiMosi, uint8_t spiMiso, uint8_t spiCs, uint32_t spiClkFreq = 100000);
     void beginI2C(uint8_t I2Cadd);
 
+    void setAccelerationFastCompensation(uint8_t offset_target_x, uint8_t offset_target_y, uint8_t offset_target_z);
+
+    void getOffsets();
+    void printOffset();
+
     void getAcceleration(int16_t* ax, int16_t* ay, int16_t* az);
     int16_t getAccelerationX();
     int16_t getAccelerationY();
@@ -114,6 +136,8 @@ private:
     uint8_t INT_PIN = 5;
     Error error_status = Error::NoError;
     uint16_t TOTAL_CALIBRATION_TIME = 5000;
+
+    uint8_t offsets[3];
 
     uint8_t readRegister(int reg);
     uint8_t writeRegister(int reg, int data);

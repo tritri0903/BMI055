@@ -61,7 +61,7 @@ void BMI055::beginSPI(uint8_t spiClk, uint8_t spiMosi, uint8_t spiMiso, uint8_t 
         delay(500);
         writeRegister(ACC_RANGE, ACC_RANGE_2G); // 2g
         delay(10);
-        writeRegister(ACC_BW, 0x0d); // 500hz
+        writeRegister(ACC_BW, ACC_BW_1000); // 
         delay(10);
         writeRegister(ACC_DATA_EN, 0b00010000);
         delay(10);
@@ -85,6 +85,63 @@ void BMI055::beginSPI(uint8_t spiClk, uint8_t spiMosi, uint8_t spiMiso, uint8_t 
         error_status = Error::WrongChipID;
     }
 };
+
+
+/** Set and activate the acceleration fast compensation mode. 
+ * 
+ * Each axe can be calibrate on a specifique target. Here is a table of the values:
+ * 
+ * <pre>
+ *      TARGET      VALUES
+ *      0           0g
+ *      1           +1g
+ *      2           -1g
+ * </pre>
+ * @param offset_target Target value for each axe
+*/
+void BMI055::setAccelerationFastCompensation(uint8_t offset_target_x, uint8_t offset_target_y, uint8_t offset_target_z){
+    uint16_t cal_rdy;
+
+    uint8_t offset_target = (offset_target_x<<ACC_OFC_OFFSET_TARGET_X)|(offset_target_y<<ACC_OFC_OFFSET_TARGET_Y)|(offset_target_z<<ACC_OFC_OFFSET_TARGET_Z);
+
+    writeRegister(ACC_OFC_OFFSET, offset_target);
+
+    writeRegister(ACC_OFC_CTRL, ACC_OFC_AXE_X);
+    while(!cal_rdy){
+        cal_rdy = readRegister(ACC_OFC_CTRL)&0x10;
+        Serial.print(".");
+    }
+    cal_rdy = 0;
+
+    writeRegister(ACC_OFC_CTRL, ACC_OFC_AXE_Y);
+    while(!cal_rdy){
+        cal_rdy = readRegister(ACC_OFC_CTRL)&0x10;
+        Serial.print(".");
+    }
+    cal_rdy = 0;
+
+    writeRegister(ACC_OFC_CTRL, ACC_OFC_AXE_Z);
+    while(!cal_rdy){
+        cal_rdy = readRegister(ACC_OFC_CTRL)&0x10;
+        Serial.print(".");
+    }
+}
+
+void BMI055::getOffsets(){
+    offsets[0] = readRegister(ACC_OFFSET_X);
+    offsets[1] = readRegister(ACC_OFFSET_Y);
+    offsets[2] = readRegister(ACC_OFFSET_Z);
+}
+
+void BMI055::printOffset(){
+    BMI055::getOffsets();
+    for (size_t i = 0; i < 3; i++)
+    {
+        Serial.print(offsets[i]);
+        Serial.print("-");
+    }
+    Serial.println("");
+}
 
 /** Get the X-axis acceleration value from the BMI055 accelerometer.
  *
